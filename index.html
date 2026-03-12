@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Gestão de Clientes - Dashboard Pro</title>
+    <style>
+        :root { --ativo: #4af772; --pendente: #f7db08; --suspenso: #fb071f; --gray: #6c757d; --bg: #f4f6f9; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 20px; }
+        .container { max-width: 1800px; margin: 0 auto; }
+        
+        .panel { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .form-row { display: flex; flex-wrap: wrap; gap: 10px; }
+        input, select, textarea { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+        .flex-1 { flex: 1; min-width: 200px; }
+
+        .card { background: white; padding: 20px; border-radius: 12px; margin-bottom: 25px; border-top: 10px solid var(--gray); transition: 0.3s; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .status-ativo { border-top-color: var(--ativo); }
+        .status-pendente { border-top-color: var(--pendente); }
+        .status-suspenso { border-top-color: var(--suspenso); opacity: 0.8; }
+
+        .card-header { display: flex; justify-content: space-between; border-bottom: 1px solid #eee; padding-bottom: 12px; margin-bottom: 15px; }
+        .client-info h3 { margin: 0; font-size: 20px; }
+        .contact-bar { display: flex; gap: 20px; margin-top: 5px; font-size: 13px; color: #555; }
+        .btn-status-group { display: flex; gap: 5px; }
+        .btn-st { border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; font-size: 11px; }
+
+        .col-menus { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; align-items: start; }
+        details { border: 1px solid #eee; border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+        summary { padding: 10px; cursor: pointer; font-weight: bold; font-size: 12px; list-style: none; display: flex; justify-content: space-between; color: white; align-items: center; }
+        
+        /* Cores dos Menus */
+        .m-coleta summary { background: #4b6584; }
+        .m-finan summary { background: #34495e; }
+        .m-infra summary { background: #2c3e50; }
+        .m-gerencia summary { background: #7f8c8d; }
+
+        /* Estilo para Menu Desativado */
+        .menu-off { opacity: 0.4; filter: grayscale(1); pointer-events: none; }
+        .btn-toggle-menu { background: rgba(255,255,255,0.2); border: 1px solid white; color: white; font-size: 9px; padding: 2px 5px; border-radius: 3px; cursor: pointer; pointer-events: auto; }
+        .btn-toggle-menu:hover { background: white; color: #333; }
+
+        .inner-content { padding: 10px; font-size: 11px; background: #fff; }
+        .month-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+        .month-item { border: 1px solid #eee; padding: 4px; display: flex; flex-direction: column; align-items: center; border-radius: 4px; background: #fdfdfd; }
+        
+        .sub-details { margin: 3px 0; border-left: 3px solid #ddd; }
+        .sub-details summary { background: #f8f9fa !important; color: #333 !important; border-bottom: 1px solid #eee; }
+        .gerencia-input { width: 100%; box-sizing: border-box; margin-bottom: 8px; border: 1px solid #eee; min-height: 35px; resize: vertical; }
+
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="panel">
+        <h2 style="margin-top:0; font-size: 18px;">Novo Cadastro</h2>
+        <div class="form-row">
+            <input type="text" id="rs" placeholder="Razão Social" class="flex-1">
+            <input type="text" id="cnpj" placeholder="CNPJ" class="flex-1">
+            <input type="text" id="tel" placeholder="WhatsApp (DDD+Número)">
+            <input type="email" id="email" placeholder="E-mail" class="flex-1">
+            <button onclick="novoCliente()" style="background:var(--ativo); color:white; border:none; padding:10px 20px; border-radius:6px; cursor:pointer">Cadastrar</button>
+        </div>
+    </div>
+
+    <div class="panel" style="display:flex; gap:15px">
+        <input type="text" id="searchName" placeholder="🔍 Buscar por nome..." onkeyup="filtrar()" style="flex:1">
+        <select id="filterStatus" onchange="filtrar()">
+            <option value="todos">Todos os Status</option>
+            <option value="ativo">Ativos</option>
+            <option value="pendente">Corrigir Dados</option>
+            <option value="suspenso">Suspensos/Cancelados</option>
+        </select>
+    </div>
+
+    <div id="container"></div>
+</div>
+
+<script>
+const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+const anos_full = [2020, 2021, 2022, 2023, 2024, 2025, 2026];
+
+window.onload = carregarClientes;
+
+function novoCliente() {
+    const rs = document.getElementById('rs').value;
+    const cnpj = document.getElementById('cnpj').value;
+    const email = document.getElementById('email').value;
+    let tel = document.getElementById('tel').value.replace(/\D/g, '');
+    if(!rs || !tel) return alert("Razão Social e Telefone são obrigatórios!");
+    if (tel.length <= 11) tel = '55' + tel;
+
+    const cliente = { id: Date.now(), rs, cnpj, email, tel, status: 'ativo' };
+    let clientes = JSON.parse(localStorage.getItem('meusClientes') || '[]');
+    clientes.push(cliente);
+    localStorage.setItem('meusClientes', JSON.stringify(clientes));
+    location.reload();
+}
+
+function renderizarCard(c) {
+    const card = document.createElement('div');
+    card.className = `card status-${c.status}`;
+    card.id = `card-${c.id}`;
+    card.dataset.status = c.status;
+    card.dataset.nome = c.rs.toLowerCase();
+
+    const templateMeses = (tipo, ano) => meses.map(m => `
+        <div class="month-item">
+            <label style="font-size:9px"><input type="checkbox"> ${m}</label>
+            <input type="text" style="width:35px; font-size:8px" placeholder="Link" onchange="salvarLink('${c.id}','${tipo}-${ano}','${m}',this.value)" id="in-${c.id}-${tipo}-${ano}-${m}">
+            <a href="#" id="dl-${c.id}-${tipo}-${ano}-${m}" target="_blank" style="display:none; text-decoration:none; font-size:12px">📥</a>
+        </div>
+    `).join('');
+
+    card.innerHTML = `
+        <div class="card-header">
+            <div class="client-info">
+                <h3>${c.rs} <small style="color:#888; font-size:12px">CNPJ: ${c.cnpj}</small></h3>
+                <div class="contact-bar">
+                    <span>📞 ${c.tel} <a href="https://wa.me{c.tel}" target="_blank">🟢</a></span>
+                    <span>📧 ${c.email} <a href="mailto:${c.email}">📩</a></span>
+                </div>
+            </div>
+            <div class="btn-status-group">
+                <button class="btn-st" style="background:var(--ativo)" onclick="mudarStatus(${c.id}, 'ativo')">ATIVO</button>
+                <button class="btn-st" style="background:var(--pendente); color:#333" onclick="mudarStatus(${c.id}, 'pendente')">CORRIGIR</button>
+                <button class="btn-st" style="background:var(--suspenso)" onclick="mudarStatus(${c.id}, 'suspenso')">SUSPENSO</button>
+                <button class="btn-st" style="background:#eee; color:#333; margin-left:10px" onclick="removerCliente(${c.id})">Excluir</button>
+            </div>
+        </div>
+
+        <div class="col-menus">
+            <div class="m-coleta">
+                <details><summary>📅 Coleta Mensal (24-26)</summary>
+                    <div class="inner-content">${[2024,2025,2026].map(ano => `<details class="sub-details"><summary>Ano ${ano}</summary><div class="month-grid">${templateMeses('col', ano)}</div></details>`).join('')}</div>
+                </details>
+                <details id="det-postes-${c.id}"><summary>📜 Infra - Uso Postes <button class="btn-toggle-menu" onclick="toggleMenu('${c.id}', 'postes')">ON/OFF</button></summary>
+                    <div class="inner-content">
+                        <textarea class="gerencia-input" placeholder="Detalhes..." id="postes-${c.id}" onchange="salvarPostes(${c.id})"></textarea>
+                        <label><input type="checkbox"> Documentação OK</label>
+                    </div>
+                </details>
+            </div>
+
+            <div class="m-finan">
+                <details id="det-tv-${c.id}"><summary>📺 TVpA (2020-2026) <button class="btn-toggle-menu" onclick="toggleMenu('${c.id}', 'tv')">ON/OFF</button></summary>
+                    <div class="inner-content">${anos_full.map(ano => `<details class="sub-details"><summary>Ano ${ano}</summary><div class="month-grid">${templateMeses('tv', ano)}</div></details>`).join('')}</div>
+                </details>
+                <details id="det-stfc-${c.id}"><summary>☎️ STFC (2020-2026) <button class="btn-toggle-menu" onclick="toggleMenu('${c.id}', 'stfc')">ON/OFF</button></summary>
+                    <div class="inner-content">${anos_full.map(ano => `<details class="sub-details"><summary>Ano ${ano}</summary><div class="month-grid">${templateMeses('stfc', ano)}</div></details>`).join('')}</div>
+                </details>
+            </div>
+
+            <div class="m-infra">
+                <details><summary>💰 Financeiro (PPP)</summary>
+                    <div class="inner-content">${anos_full.map(ano => `<details class="sub-details"><summary>Ano ${ano}</summary><div style="padding:5px"><label><input type="checkbox"> 1º Sem.</label> | <label><input type="checkbox"> 2º Sem.</label></div></details>`).join('')}</div>
+                </details>
+                <details><summary>📡 Infra Telecomunicações</summary>
+                    <div class="inner-content">${anos_full.map(ano => `<details class="sub-details"><summary>Ano ${ano}</summary><div style="padding:5px; line-height:1.5"><label><input type="checkbox"> L: Estações</label><br><label><input type="checkbox"> L: Enl. Próprios</label><br><label><input type="checkbox"> L: Enl. Contratados</label></div></details>`).join('')}</div>
+                </details>
+            </div>
+
+            <div class="m-gerencia">
+                <details open><summary>⚙️ GERENCIADOR</summary>
+                    <div class="inner-content">
+                        <textarea class="gerencia-input" id="g1-${c.id}" onchange="salvarGerenciador(${c.id})"></textarea>
+                        <textarea class="gerencia-input" id="g2-${c.id}" onchange="salvarGerenciador(${c.id})"></textarea>
+                        <textarea class="gerencia-input" id="g3-${c.id}" onchange="salvarGerenciador(${c.id})"></textarea>
+                    </div>
+                </details>
+            </div>
+        </div>
+    `;
+    document.getElementById('container').appendChild(card);
+    recuperarTudo(c.id);
+}
+
+function toggleMenu(id, menu) {
+    const key = `toggle-${id}-${menu}`;
+    const estado = localStorage.getItem(key) === 'off' ? 'on' : 'off';
+    localStorage.setItem(key, estado);
+    aplicarEstadoMenu(id, menu, estado);
+}
+
+function aplicarEstadoMenu(id, menu, estado) {
+    const det = document.getElementById(`det-${menu}-${id}`);
+    if(estado === 'off') {
+        det.classList.add('menu-off');
+        det.removeAttribute('open');
+    } else {
+        det.classList.remove('menu-off');
+    }
+}
+
+function salvarLink(id, tipoAno, mes, valor) {
+    const key = `links-${id}`;
+    let links = JSON.parse(localStorage.getItem(key) || '{}');
+    links[`${tipoAno}-${mes}`] = valor;
+    localStorage.setItem(key, JSON.stringify(links));
+    const btn = document.getElementById(`dl-${id}-${tipoAno}-${mes}`);
+    if(btn) { btn.href = valor; btn.style.display = valor ? 'inline' : 'none'; }
+}
+
+function salvarGerenciador(id) {
+    const dados = { info1: document.getElementById(`g1-${id}`).value, info2: document.getElementById(`g2-${id}`).value, info3: document.getElementById(`g3-${id}`).value };
+    localStorage.setItem(`gerencia-${id}`, JSON.stringify(dados));
+}
+
+function salvarPostes(id) {
+    localStorage.setItem(`postes-${id}`, document.getElementById(`postes-${id}`).value);
+}
+
+function recuperarTudo(id) {
+    const links = JSON.parse(localStorage.getItem(`links-${id}`) || '{}');
+    for (const k in links) {
+        const el = document.getElementById(`in-${id}-${k}`);
+        const btn = document.getElementById(`dl-${id}-${k}`);
+        if(el) { el.value = links[k]; btn.href = links[k]; btn.style.display = links[k] ? 'inline' : 'none'; }
+    }
+    const ger = JSON.parse(localStorage.getItem(`gerencia-${id}`) || '{}');
+    if(ger.info1) document.getElementById(`g1-${id}`).value = ger.info1;
+    if(ger.info2) document.getElementById(`g2-${id}`).value = ger.info2;
+    if(ger.info3) document.getElementById(`g3-${id}`).value = ger.info3;
+    const p = localStorage.getItem(`postes-${id}`);
+    if(p) document.getElementById(`postes-${id}`).value = p;
+
+    // Recuperar estados dos menus ON/OFF
+    ['postes', 'tv', 'stfc'].forEach(m => {
+        const estado = localStorage.getItem(`toggle-${id}-${m}`);
+        if(estado) aplicarEstadoMenu(id, m, estado);
+    });
+}
+
+function mudarStatus(id, novoStatus) {
+    let clientes = JSON.parse(localStorage.getItem('meusClientes') || '[]');
+    const idx = clientes.findIndex(c => c.id === id);
+    if(idx !== -1) {
+        clientes[idx].status = novoStatus;
+        localStorage.setItem('meusClientes', JSON.stringify(clientes));
+        location.reload();
+    }
+}
+
+function filtrar() {
+    const nome = document.getElementById('searchName').value.toLowerCase();
+    const status = document.getElementById('filterStatus').value;
+    document.querySelectorAll('.card').forEach(card => {
+        const matchNome = card.dataset.nome.includes(nome);
+        const matchStatus = status === 'todos' || card.dataset.status === status;
+        card.classList.toggle('hidden', !(matchNome && matchStatus));
+    });
+}
+
+function carregarClientes() {
+    const clientes = JSON.parse(localStorage.getItem('meusClientes') || '[]');
+    clientes.forEach(renderizarCard);
+}
+
+function removerCliente(id) {
+    if(confirm("Excluir cliente?")) {
+        let clientes = JSON.parse(localStorage.getItem('meusClientes') || '[]');
+        localStorage.setItem('meusClientes', JSON.stringify(clientes.filter(c => c.id !== id)));
+        location.reload();
+    }
+}
+</script>
+</body>
+</html>
