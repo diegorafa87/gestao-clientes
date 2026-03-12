@@ -4,19 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestão de Clientes PRO</title>
-    <!-- Versão de CDN Alternativa e Segura -->
-    <script src="https://www.gstatic.com"></script>
-    <script src="https://www.gstatic.com"></script>
+    <!-- Firebase SDKs via CDN JSDelivr (Mais estável que o padrão) -->
+    <script src="https://cdn.jsdelivr.net"></script>
+    <script src="https://cdn.jsdelivr.net"></script>
     <style>
         :root { --ativo: #28a745; --pendente: #ffc107; --suspenso: #dc3545; --gray: #6c757d; --bg: #f4f6f9; --novo: #007bff; --dark: #2c3e50; }
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); margin: 0; padding: 20px; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); margin: 0; padding: 20px; }
         .container { max-width: 1300px; margin: 0 auto; }
         .panel { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .card { background: white; padding: 20px; border-radius: 12px; margin-bottom: 10px; border-top: 8px solid var(--gray); display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .card.is-new { border-top-color: var(--novo) !important; background-color: #f0f7ff; border-left: 5px solid var(--novo); }
-        .btn { border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; color: white; }
+        .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 10px; border-top: 6px solid var(--gray); display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .card.is-new { border-top-color: var(--novo) !important; background-color: #f0f7ff; border-left: 4px solid var(--novo); }
+        .btn { border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; color: white; transition: 0.2s; }
         .grid-ficha { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; }
-        details { background: white; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 8px; }
+        details { background: white; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
         summary { padding: 12px; cursor: pointer; font-weight: bold; background: #4b6584; color: white; border-radius: 6px; display: flex; justify-content: space-between; list-style: none; }
         .menu-especial summary { background: #6c5ce7; }
         .month-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; padding: 10px; }
@@ -25,20 +25,22 @@
         .dot-ok { background: var(--ativo); }
         .hidden { display: none; }
         input { padding: 10px; border: 1px solid #ddd; border-radius: 6px; margin: 5px; width: 180px; }
-        #status-box { padding: 10px; border-radius: 6px; margin-bottom: 15px; font-weight: bold; text-align: center; }
+        #status-box { padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; text-align: center; border: 1px solid #eee; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div id="status-box" style="background: #fff3cd; color: #856404;">⏳ CONECTANDO AO FIREBASE...</div>
+    <div id="status-box" style="background: #fff3cd; color: #856404;">⏳ VERIFICANDO CONEXÃO...</div>
 
     <div id="tela-lista">
         <div class="panel">
             <h2 style="margin:0 0 15px 0">Novo Cliente</h2>
-            <input type="text" id="rs" placeholder="Razão Social">
-            <input type="text" id="cnpj" placeholder="CNPJ">
-            <button class="btn" style="background:var(--ativo)" onclick="novoCliente()">CADASTRAR</button>
+            <div style="display:flex; flex-wrap:wrap; gap:5px">
+                <input type="text" id="rs" placeholder="Razão Social">
+                <input type="text" id="cnpj" placeholder="CNPJ">
+                <button class="btn" style="background:var(--ativo)" onclick="novoCliente()">CADASTRAR</button>
+            </div>
         </div>
         <div id="lista-clientes"></div>
     </div>
@@ -50,7 +52,7 @@
 </div>
 
 <script>
-// CONFIGURAÇÃO VERIFICADA
+// CONFIGURAÇÃO DO SEU PROJETO
 const firebaseConfig = {
     apiKey: "AIzaSyBUU5U5upiAqZfLb8ecuSMEcvkoboXe6rk",
     authDomain: "gestaooficial-f1527.firebaseapp.com",
@@ -61,60 +63,69 @@ const firebaseConfig = {
     appId: "1:1060376090119:web:3a1b38e7c57a6f0eb53ca2"
 };
 
-// INICIALIZAÇÃO COM VERIFICAÇÃO DE ERRO
+// TENTATIVA DE INICIALIZAÇÃO
+let db;
 try {
-    if (!firebase.apps.length) {
+    if (typeof firebase !== 'undefined') {
         firebase.initializeApp(firebaseConfig);
+        db = firebase.database();
+        
+        // Monitor de conexão real
+        db.ref(".info/connected").on("value", (snap) => {
+            const box = document.getElementById('status-box');
+            if (snap.val() === true) {
+                box.innerHTML = "✅ SISTEMA ONLINE - PRONTO PARA USO";
+                box.style.background = "#d4edda";
+                box.style.color = "#155724";
+            } else {
+                box.innerHTML = "⚠️ TENTANDO RECONECTAR AO BANCO...";
+                box.style.background = "#fff3cd";
+                box.style.color = "#856404";
+            }
+        });
+    } else {
+        throw new Error("Biblioteca Firebase não carregou.");
     }
-    var db = firebase.database();
 } catch (e) {
-    document.getElementById('status-box').innerHTML = "❌ ERRO DE CONFIGURAÇÃO: " + e.message;
+    document.getElementById('status-box').innerHTML = "❌ ERRO: Verifique se o Firebase está ativo ou sua internet.";
+    document.getElementById('status-box').style.background = "#f8d7da";
 }
 
-// MONITOR DE CONEXÃO
-db.ref(".info/connected").on("value", (snap) => {
-    const box = document.getElementById('status-box');
-    if (snap.val() === true) {
-        box.innerHTML = "✅ SISTEMA ONLINE - CONECTADO";
-        box.style.background = "#d4edda";
-        box.style.color = "#155724";
-    } else {
-        box.innerHTML = "⚠️ AGUARDANDO CONEXÃO...";
-        box.style.background = "#f8d7da";
-        box.style.color = "#721c24";
-    }
-});
-
 const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-const anos =;
+const anos = [2020, 2021, 2022, 2023, 2024, 2025, 2026];
 
-// ESCUTAR DADOS
-db.ref('clientes').on('value', (snap) => {
-    const cont = document.getElementById('lista-clientes');
-    cont.innerHTML = '';
-    const data = snap.val();
-    if(!data) {
-        cont.innerHTML = "<div class='panel'>Nenhum cliente encontrado. Cadastre o primeiro acima!</div>";
-        return;
-    }
-    Object.keys(data).forEach(id => {
-        const c = data[id];
-        const card = document.createElement('div');
-        card.className = `card ${c.lido === false ? 'is-new' : ''}`;
-        card.innerHTML = `<div><b>${c.rs}</b><br><small>${c.cnpj || ''}</small></div>
-                          <button class="btn" style="background:var(--dark)" onclick="abrirFicha('${id}')">ABRIR</button>`;
-        cont.appendChild(card);
+// ESCUTAR DADOS EM TEMPO REAL
+if (db) {
+    db.ref('clientes').on('value', (snap) => {
+        const cont = document.getElementById('lista-clientes');
+        cont.innerHTML = '';
+        const data = snap.val();
+        if(!data) {
+            cont.innerHTML = "<div class='panel'>Aguardando cadastros...</div>";
+            return;
+        }
+        Object.keys(data).forEach(id => {
+            const c = data[id];
+            const card = document.createElement('div');
+            card.className = `card ${c.lido === false ? 'is-new' : ''}`;
+            card.innerHTML = `<div><b>${c.rs}</b><br><small>CNPJ: ${c.cnpj || '---'}</small></div>
+                              <button class="btn" style="background:var(--dark)" onclick="abrirFicha('${id}')">ABRIR FICHA</button>`;
+            cont.appendChild(card);
+        });
     });
-}, (error) => {
-    document.getElementById('lista-clientes').innerHTML = "❌ ERRO DE PERMISSÃO: Verifique as regras do Firebase.";
-});
+}
 
 function novoCliente() {
     const rs = document.getElementById('rs').value;
     const cnpj = document.getElementById('cnpj').value;
     if(!rs) return alert("Digite a Razão Social!");
+    if(!db) return alert("Erro: Banco de dados não conectado.");
+
     db.ref('clientes/' + Date.now()).set({ rs, cnpj, lido: false, status: 'ativo' })
-      .then(() => { document.getElementById('rs').value = ''; document.getElementById('cnpj').value = ''; });
+      .then(() => { 
+          document.getElementById('rs').value = ''; 
+          document.getElementById('cnpj').value = ''; 
+      }).catch(err => alert("Erro ao salvar: " + err.message));
 }
 
 function abrirFicha(id) {
@@ -145,7 +156,8 @@ function abrirFicha(id) {
 }
 
 function toggleDot(id, tip, ano, m, st) {
-    db.ref(`clientes/${id}/dots/${tip}/${ano}/${m}`).set(st === 'pendente' ? 'ok' : 'pendente');
+    const novo = st === 'pendente' ? 'ok' : 'pendente';
+    db.ref(`clientes/${id}/dots/${tip}/${ano}/${m}`).set(novo);
 }
 </script>
 </body>
